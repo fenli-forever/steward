@@ -89,7 +89,7 @@ pnpm tauri         # 透传 Tauri CLI（dev / build / android / ios）
 | 工作流 | 触发 | 内容 |
 | --- | --- | --- |
 | `ci.yml` | push main / PR | 类型检查、单测、前端构建、`cargo check`（约 5 分钟） |
-| `build.yml` | 手动 / `v*` tag | macOS `.dmg`、Windows `.exe`+`.msi`、Linux `.AppImage`+`.deb`、Android `.apk`、iOS 模拟器包 |
+| `build.yml` | 手动 / `v*` tag | macOS `.dmg`、Windows `.exe`+`.msi`、Linux `.AppImage`+`.deb`、Android `.apk`、iOS 模拟器包 + 可选签名 `.ipa` |
 
 打一个 tag 就会把五端产物汇总成草稿 Release：
 
@@ -98,8 +98,9 @@ git tag v0.1.0
 git push origin v0.1.0      # 需先配好 git remote
 ```
 
-默认产出**未正式签名**的包（debug APK、模拟器 .app、ad-hoc 签名的 macOS 包），
-接入证书的方式与各平台 Secret 清单见 [docs/05-ci.md](docs/05-ci.md)。
+默认产出**未正式签名**的包（debug APK、模拟器 .app、ad-hoc 签名的 macOS 包）；
+真机可安装的 iOS `.ipa` 需要 Apple 开发者账号，配好 Secret 后把仓库变量 `ENABLE_IOS_SIGNING`
+设为 `true` 即可启用。签名方式与各平台 Secret 清单见 [docs/05-ci.md](docs/05-ci.md)。
 
 ## 目录结构
 

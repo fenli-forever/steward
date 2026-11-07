@@ -279,9 +279,75 @@ jobs:
           if-no-files-found: error
           path: steward-ios-simulator.zip
 
+  # 真机可安装的 IPA 需要 Apple 开发者账号（$99/年）与证书，无法默认开启。
+  # 配置仓库变量 ENABLE_IOS_SIGNING=true + 三个 Secret 后，这个 job 才会运行。
+  # 详见 docs/05-ci.md 的「iOS 安装包」一节。
+  ios-ipa:
+    name: iOS 签名 IPA（开发签名，需证书）
+    needs: test
+    if: ${{ vars.ENABLE_IOS_SIGNING == 'true' }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装 Rust（iOS 真机目标）
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/app/src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @steward/core build
+
+      - name: 安装 Provisioning Profile
+        env:
+          IOS_MOBILE_PROVISION: ${{ secrets.IOS_MOBILE_PROVISION }}
+        run: |
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$IOS_MOBILE_PROVISION" | base64 -d > "$HOME/Library/MobileDevice/Provisioning Profiles/steward.mobileprovision"
+
+      - name: 初始化 iOS 工程
+        working-directory: apps/app
+        run: pnpm tauri ios init --ci
+
+      # debugging = 开发签名：只能装在开发者账号里登记过 UDID 的设备上。
+      # 要给测试人员用请改用 --export-method release-testing（TestFlight）。
+      - name: 构建 IPA
+        working-directory: apps/app
+        env:
+          IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_MOBILE_PROVISION: ${{ secrets.IOS_MOBILE_PROVISION }}
+        run: pnpm tauri ios build --export-method debugging --ci
+
+      - name: 收集 IPA
+        run: |
+          IPA=$(find apps/app/src-tauri/gen/apple -maxdepth 6 -name '*.ipa' | head -n 1)
+          if [ -z "$IPA" ]; then
+            echo "未找到 .ipa，输出目录："
+            find apps/app/src-tauri/gen/apple -maxdepth 4 -type d | head -n 40
+            exit 1
+          fi
+          cp "$IPA" steward-ios.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steward-ios-ipa
+          if-no-files-found: error
+          path: steward-ios.ipa
+
   release:
     name: 汇总到 Release
-    needs: [macos, windows, linux, android, ios]
+    needs: [macos, windows, linux, android, ios, ios-ipa]
     if: ${{ always() && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     steps:
