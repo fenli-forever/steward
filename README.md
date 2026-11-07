@@ -27,6 +27,7 @@
 | 银行账单 CSV 导入（多格式、容错、逐行报错） | ✅ 可用，52 个单测覆盖 |
 | 多云主机列表 / 开关机 / 成本汇总 | ✅ 界面与数据流已通，**适配器为 Mock** |
 | 端到端加密同步（自建服务器、设备配对、LWW 合并） | ✅ 协议与服务端已完成，30+ 单测 |
+| 自动更新（GitHub Releases + Ed25519 签名） | ✅ 桌面端已接入，见 docs/06-updater.md |
 | 真实云厂商 SDK（阿里云/腾讯云/AWS） | ⛔ 未接入，见路线图 |
 | 智能家居（Home Assistant / Matter） | ⛔ 数据模型已预留，未接入 |
 
@@ -80,6 +81,7 @@ pnpm build         # 构建 core + 前端产物
 pnpm dev           # 前端开发服务器
 pnpm dev:sync      # 同步服务（watch 模式）
 pnpm tauri         # 透传 Tauri CLI（dev / build / android / ios）
+pnpm version:bump  # 一处改版本：package.json / tauri.conf / Cargo.toml / Cargo.lock
 ```
 
 ## 持续集成与多端打包
@@ -115,6 +117,7 @@ packages/core/            与平台无关的领域层（零 DOM、零 SDK 依赖
   src/crypto/             XChaCha20-Poly1305、scrypt 密钥派生
   src/sync/               记录封包、LWW 合并、同步客户端
 services/sync/            自托管同步服务（Fastify + node:sqlite）
+scripts/                  打包配置注入、latest.json 生成、版本号同步
 .github/workflows/        CI（质量门禁）与多端打包流水线
 docs/                     产品、架构、安全、路线图、CI 说明
 ```
@@ -128,7 +131,7 @@ docs/                     产品、架构、安全、路线图、CI 说明
 5. **适配器模式**：云厂商差异被 `CloudProviderAdapter` 吸收，接真实 SDK 时不动 UI。
 
 细节见 [docs/02-architecture.md](docs/02-architecture.md) 与 [docs/03-security.md](docs/03-security.md)；
-多端打包与签名见 [docs/05-ci.md](docs/05-ci.md)。
+多端打包与签名见 [docs/05-ci.md](docs/05-ci.md)，自动更新见 [docs/06-updater.md](docs/06-updater.md)。
 
 ## 已知限制（v0.1）
 

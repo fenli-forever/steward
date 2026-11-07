@@ -79,6 +79,10 @@ fn app_info() -> AppInfo {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // 自动更新：检查 / 下载 / 安装（仅桌面端；移动端走应用商店）
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        // 安装完成后重启进程
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             secret_set,
             secret_get,

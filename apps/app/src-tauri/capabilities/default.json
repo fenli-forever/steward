@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "默认权限：只开放窗口与事件等核心能力，不额外授予文件/网络/剪贴板权限",
+  "description": "默认权限：窗口/事件等核心能力 + 更新检查与重启",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "updater:default", "process:default"]
 }

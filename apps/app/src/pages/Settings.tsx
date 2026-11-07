@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { estimatePassphraseStrength, MIN_PASSPHRASE_LENGTH } from '@steward/core';
 import { useAppStore } from '../data/store';
 import { usingSystemKeychain } from '../data/secrets';
+import { useUpdater } from '../data/updater';
 import { Badge, Notice, PageHeader } from '../components/ui';
 
 const STRENGTH_LABEL = ['太短', '弱', '一般', '不错', '很强'];
@@ -174,6 +175,8 @@ export default function SettingsPage() {
         </section>
 
         <div className="grid" style={{ alignContent: 'start' }}>
+          <UpdatePanel />
+
           <section className="panel">
             <div className="panel-head">
               <h2 className="panel-title">安全模型</h2>
@@ -251,5 +254,75 @@ export default function SettingsPage() {
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * 版本与更新。
+ * 桌面端从 GitHub Releases 的 latest.json 检查更新；移动端交给应用商店。
+ */
+function UpdatePanel() {
+  const { status, currentVersion, available, progress, error, check, install, restart } = useUpdater();
+
+  const statusText: Record<typeof status, string> = {
+    idle: '尚未检查',
+    unsupported: '当前环境不支持自动更新（浏览器预览 / 移动端）',
+    checking: '正在检查…',
+    available: `发现新版本 v${available?.version ?? ''}`,
+    'up-to-date': '已是最新版本',
+    downloading: '正在下载…',
+    ready: '下载完成，重启后生效',
+    error: error ?? '检查失败',
+  };
+
+  return (
+    <section className="panel">
+      <div className="panel-head">
+        <h2 className="panel-title">版本与更新</h2>
+        <Badge tone={status === 'available' ? 'green' : 'muted'}>v{currentVersion}</Badge>
+      </div>
+
+      <p className="muted" style={{ margin: '0 0 12px', fontSize: 12.5 }}>
+        {statusText[status]}
+        {status === 'available' && available?.date ? ` · 发布于 ${new Date(available.date).toLocaleDateString('zh-CN')}` : ''}
+      </p>
+
+      {status === 'downloading' && progress !== null ? (
+        <div className="usage" style={{ marginBottom: 12 }}>
+          <div className="usage-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+        </div>
+      ) : null}
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          className="btn btn-sm"
+          onClick={() => void check()}
+          disabled={status === 'unsupported' || status === 'checking' || status === 'downloading'}
+        >
+          检查更新
+        </button>
+        {status === 'available' ? (
+          <button className="btn btn-sm btn-primary" onClick={() => void install()}>
+            下载并安装 v{available?.version}
+          </button>
+        ) : null}
+        {status === 'ready' ? (
+          <button className="btn btn-sm btn-primary" onClick={() => void restart()}>
+            重启生效
+          </button>
+        ) : null}
+      </div>
+
+      {status === 'error' ? (
+        <div style={{ marginTop: 12 }}>
+          <Notice tone="warn">{error}</Notice>
+        </div>
+      ) : null}
+
+      <p className="dim" style={{ margin: '12px 0 0', fontSize: 11.5, lineHeight: 1.6 }}>
+        更新包用 Ed25519 签名，应用内置公钥校验；签名不匹配会被拒绝安装。
+        更新源来自 GitHub Releases，不会上传任何本地数据。
+      </p>
+    </section>
   );
 }

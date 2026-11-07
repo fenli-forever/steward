@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
 import DashboardPage from './pages/Dashboard';
 import CardsPage from './pages/Cards';
 import CloudPage from './pages/Cloud';
 import SettingsPage from './pages/Settings';
+import { autoCheckForUpdates, useUpdater } from './data/updater';
 
 const NAV = [
   { to: '/', label: '总览', icon: '◎', end: true },
@@ -12,6 +14,14 @@ const NAV = [
 ];
 
 export default function App() {
+  const updateVersion = useUpdater((state) => (state.status === 'available' ? state.available?.version : undefined));
+
+  // 启动 3 秒后静默检查一次更新，失败不打扰用户
+  useEffect(() => {
+    const timer = setTimeout(() => autoCheckForUpdates(), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -42,6 +52,11 @@ export default function App() {
         <div className="sidebar-footer">
           <div>本地优先 · 端到端加密</div>
           <div>v0.1.0 MVP</div>
+          {updateVersion ? (
+            <NavLink to="/settings" style={{ color: 'var(--green)', fontWeight: 600 }}>
+              有新版本 v{updateVersion} →
+            </NavLink>
+          ) : null}
         </div>
       </aside>
 

@@ -14,7 +14,10 @@
     "dev": "pnpm --filter @steward/core build && pnpm --filter @steward/app dev",
     "dev:sync": "pnpm --filter @steward/sync dev",
     "tauri": "pnpm --filter @steward/app tauri",
-    "clean": "rm -rf packages/*/dist services/*/dist apps/*/dist"
+    "clean": "rm -rf packages/*/dist services/*/dist apps/*/dist",
+    "version:bump": "node scripts/bump-version.mjs",
+    "build:desktop": "node scripts/desktop-build.mjs",
+    "release:latest-json": "node scripts/make-latest-json.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
