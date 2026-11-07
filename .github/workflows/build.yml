@@ -243,11 +243,20 @@ jobs:
           # runner 镜像里的 sdkmanager 可能带着旧缓存，看不到新发布的 platform
           rm -rf "$HOME/.android/cache"
           yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses > /dev/null || true
+          # 注意：Android 从 API 37 起改成「小版本」发布，包名是 platforms;android-37.0，
+          # 不再是 platforms;android-37（后者会让 sdkmanager 报 Failed to find package）
           if ! sdkmanager --sdk_root="$ANDROID_HOME" --install \
-              "ndk;27.0.12077973" "platforms;android-37" "build-tools;35.0.0" "platform-tools"; then
+              "ndk;27.0.12077973" "platforms;android-37.0" "platforms;android-36" \
+              "build-tools;35.0.0" "platform-tools"; then
             echo "== 安装失败，当前仓库可见的 platform："
             sdkmanager --sdk_root="$ANDROID_HOME" --list | grep -E "platforms;android-3[0-9]" | tail -20 || true
             exit 1
+          fi
+          # AGP 的 compileSdk = 37 会去找 platforms/android-37，但 sdkmanager 装出来是
+          # platforms/android-37.0，补一个软链让两边对齐
+          ls "$ANDROID_HOME/platforms" || true
+          if [ -d "$ANDROID_HOME/platforms/android-37.0" ] && [ ! -e "$ANDROID_HOME/platforms/android-37" ]; then
+            ln -s "$ANDROID_HOME/platforms/android-37.0" "$ANDROID_HOME/platforms/android-37"
           fi
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
