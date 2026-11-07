@@ -448,37 +448,26 @@ jobs:
         working-directory: apps/app
         run: pnpm tauri ios init --ci
 
-      - name: 构建未签名 .app
-        working-directory: apps/app/src-tauri/gen/apple
+      # Tauri 的 Xcode 工程里有个脚本阶段要连 CLI 起的 options server，
+      # 所以不能直接跑 xcodebuild；改成让 CLI 驱动构建，只是把签名关掉，
+      # 这样 archive 能生成，最后的 export 会失败（我们不关心那一步）。
+      - name: 构建（关闭签名）
+        working-directory: apps/app
         run: |
-          set -euo pipefail
-          PROJECT=$(ls -d *.xcodeproj | head -n 1)
-          echo "project: $PROJECT"
-          ls -la
-          # 工程名是 crate 名（steward），scheme 名可能不同，必须查一下
-          xcodebuild -list -project "$PROJECT"
-          SCHEME=$(xcodebuild -list -json -project "$PROJECT" \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['project']['schemes'][0])")
-          echo "scheme: $SCHEME"
-          xcodebuild \
-            -project "$PROJECT" \
-            -scheme "$SCHEME" \
-            -configuration Debug \
-            -sdk iphoneos \
-            -destination "generic/platform=iOS" \
-            -derivedDataPath "$RUNNER_TEMP/ios-dd" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            build
+          set +e
+          pnpm tauri ios build --debug --target aarch64 --ci -- \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" 2>&1 | tail -60
+          echo "tauri ios build 退出码: ${PIPESTATUS[0]}（export 阶段失败是预期的）"
+          echo "== 产物目录："
+          find src-tauri/gen/apple/build -maxdepth 4 \( -name "*.xcarchive" -o -name "*.app" \) 2>/dev/null | head -10
 
       - name: 打包成 .ipa
         run: |
           set -euo pipefail
-          APP=$(find "$RUNNER_TEMP/ios-dd/Build/Products" -maxdepth 3 -name "*.app" -type d | head -n 1)
+          APP=$(find apps/app/src-tauri/gen/apple/build -maxdepth 8 -name "*.app" -type d | head -n 1)
           if [ -z "$APP" ]; then
             echo "没找到 .app，构建产物目录如下："
-            find "$RUNNER_TEMP/ios-dd/Build/Products" -maxdepth 3 | head -n 40
+            find apps/app/src-tauri/gen/apple/build -maxdepth 4 | head -n 40
             exit 1
           fi
           echo "app=$APP"
