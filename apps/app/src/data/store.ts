@@ -25,6 +25,12 @@ import {
 } from '@steward/core';
 import { createSeedData } from './seed';
 import { deleteSecret, getSecret, setSecret } from './secrets';
+import {
+  isRealProvider,
+  listHosts as listRealHosts,
+  powerHost,
+  validateCredentials,
+} from './cloud';
 
 export interface NewCardInput {
   kind: CardKind;
@@ -209,6 +215,14 @@ export const useAppStore = create<AppState>()(
         })),
 
       addCloudAccount: async (input) => {
+        // 真实厂商先验一次凭据，避免存下错的 AK 再在同步时才发现
+        if (isRealProvider(input.provider)) {
+          await validateCredentials(input.provider, {
+            accessKeyId: input.accessKeyId,
+            accessKeySecret: input.accessKeySecret,
+          });
+        }
+
         const id = newPrefixedId('cloud');
         const secretRef = `cloud:${id}`;
         await setSecret(secretRef, JSON.stringify({ accessKeyId: input.accessKeyId, accessKeySecret: input.accessKeySecret }));
@@ -242,17 +256,29 @@ export const useAppStore = create<AppState>()(
           const credentials = raw
             ? (JSON.parse(raw) as { accessKeyId: string; accessKeySecret: string })
             : { accessKeyId: '', accessKeySecret: '' };
-          const adapter = createCloudAdapter(account.provider);
-          const result = await adapter.listHosts(credentials, account.regions);
-          if (!result.ok || !result.data) throw new Error(result.error ?? '云厂商返回空结果');
+          let normalized: Host[];
 
-          const normalized = result.data.map((host) => ({
-            ...host,
-            // Mock 适配器用 AccessKey 生成 ID；这里统一改成账号维度，保证多账号不串
-            id: `${account.id}/${host.instanceId}`,
-            cloudAccountId: account.id,
-            updatedAt: now(),
-          }));
+          if (isRealProvider(account.provider)) {
+            // 真实 API：Rust 侧签名并请求，AK 不进入 JS 请求链路
+            normalized = await listRealHosts(
+              account.provider,
+              credentials,
+              account.regions,
+              account.id,
+            );
+          } else {
+            const adapter = createCloudAdapter(account.provider);
+            const result = await adapter.listHosts(credentials, account.regions);
+            if (!result.ok || !result.data) throw new Error(result.error ?? '云厂商返回空结果');
+
+            normalized = result.data.map((host) => ({
+              ...host,
+              // Mock 适配器用 AccessKey 生成 ID；这里统一改成账号维度，保证多账号不串
+              id: `${account.id}/${host.instanceId}`,
+              cloudAccountId: account.id,
+              updatedAt: now(),
+            }));
+          }
 
           set((state) => ({
             hosts: [
@@ -293,14 +319,18 @@ export const useAppStore = create<AppState>()(
           const credentials = raw
             ? (JSON.parse(raw) as { accessKeyId: string; accessKeySecret: string })
             : { accessKeyId: '', accessKeySecret: '' };
-          const adapter = createCloudAdapter(account.provider);
-          const result =
-            action === 'stop'
-              ? await adapter.stopHost(credentials, host)
-              : action === 'start'
-                ? await adapter.startHost(credentials, host)
-                : await adapter.rebootHost(credentials, host);
-          if (!result.ok) throw new Error(result.error ?? '操作失败');
+          if (isRealProvider(account.provider)) {
+            await powerHost(account.provider, credentials, host.region, host.instanceId, action);
+          } else {
+            const adapter = createCloudAdapter(account.provider);
+            const result =
+              action === 'stop'
+                ? await adapter.stopHost(credentials, host)
+                : action === 'start'
+                  ? await adapter.startHost(credentials, host)
+                  : await adapter.rebootHost(credentials, host);
+            if (!result.ok) throw new Error(result.error ?? '操作失败');
+          }
 
           set((state) => ({
             hosts: state.hosts.map((h) =>

@@ -9,6 +9,7 @@ import {
   type CloudProviderId,
 } from '@steward/core';
 import { useAppStore } from '../data/store';
+import { providerMode } from '../data/cloud';
 import { Badge, EmptyState, HostStatusBadge, Modal, Notice, PageHeader, StatCard } from '../components/ui';
 
 const PROVIDER_LABEL: Record<CloudProviderId, string> = {
@@ -96,7 +97,12 @@ export default function CloudPage() {
                       {PROVIDER_LABEL[account.provider]} · {account.regions.join(' / ') || '未设置地域'}
                     </div>
                   </div>
-                  <Badge tone="blue">{PROVIDER_LABEL[account.provider]}</Badge>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <Badge tone={providerMode(account.provider) === 'real' ? 'green' : 'muted'}>
+                      {providerMode(account.provider) === 'real' ? '真实 API' : 'Mock'}
+                    </Badge>
+                    <Badge tone="blue">{PROVIDER_LABEL[account.provider]}</Badge>
+                  </div>
                 </div>
                 <div
                   style={{
@@ -187,7 +193,9 @@ export default function CloudPage() {
                       </td>
                       <td className="dim">{host.region}</td>
                       <td className="dim">
-                        {host.spec.cpuCores}C / {Math.round(host.spec.memoryMb / 1024)}G / {host.spec.diskGb}G
+                        {host.spec.cpuCores > 0
+                          ? `${host.spec.cpuCores}C / ${Math.round(host.spec.memoryMb / 1024)}G`
+                          : (host.spec.instanceType ?? '—')}
                       </td>
                       <td className="mono dim">{host.publicIps[0] ?? '—'}</td>
                       <td>
@@ -333,10 +341,17 @@ function AddCloudAccountModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      <Notice tone="warn">
-        当前版本使用 <strong>Mock 适配器</strong>：不会真正调用云厂商 API，只用于打通界面与数据流。
-        真实 SDK 接入见 <span className="mono">docs/04-roadmap.md</span>。
-      </Notice>
+      {provider === 'aliyun' || provider === 'aws' ? (
+        <Notice tone="ok">
+          <strong>{PROVIDER_LABEL[provider]}</strong> 走真实 OpenAPI：绑定前会先调用一次只读接口验证凭据，
+          之后每次「同步」都会实时拉取实例列表。AccessKey 只在 Rust 侧参与签名，不会进入前端请求。
+        </Notice>
+      ) : (
+        <Notice tone="warn">
+          {PROVIDER_LABEL[provider]} 目前仍是 <strong>Mock 适配器</strong>：不会调用真实 API。
+          已对接的是阿里云与 AWS。
+        </Notice>
+      )}
 
       {error ? (
         <div style={{ marginTop: 10 }}>

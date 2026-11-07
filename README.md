@@ -25,10 +25,10 @@
 | 总览聚合（资产、待还、云成本、到期提醒） | ✅ 可用 |
 | 卡包：增删卡、额度/余额、账单列表、标记已还 | ✅ 可用 |
 | 银行账单 CSV 导入（多格式、容错、逐行报错） | ✅ 可用，52 个单测覆盖 |
-| 多云主机列表 / 开关机 / 成本汇总 | ✅ 界面与数据流已通，**适配器为 Mock** |
+| 多云主机列表 / 开关机 | ✅ 阿里云 ECS、AWS EC2 走真实 OpenAPI；其余厂商 Mock |
 | 端到端加密同步（自建服务器、设备配对、LWW 合并） | ✅ 协议与服务端已完成，30+ 单测 |
 | 自动更新（GitHub Releases + Ed25519 签名） | ✅ 桌面端已接入，见 docs/06-updater.md |
-| 真实云厂商 SDK（阿里云/腾讯云/AWS） | ⛔ 未接入，见路线图 |
+| 腾讯云 / Azure / 华为云 / 火山引擎 | ⛔ 仍是 Mock，见路线图 |
 | 智能家居（Home Assistant / Matter） | ⛔ 数据模型已预留，未接入 |
 
 > Mock 适配器会生成稳定的假实例数据，用于打通界面与数据流。
@@ -131,11 +131,12 @@ docs/                     产品、架构、安全、路线图、CI 说明
 5. **适配器模式**：云厂商差异被 `CloudProviderAdapter` 吸收，接真实 SDK 时不动 UI。
 
 细节见 [docs/02-architecture.md](docs/02-architecture.md) 与 [docs/03-security.md](docs/03-security.md)；
-多端打包与签名见 [docs/05-ci.md](docs/05-ci.md)，自动更新见 [docs/06-updater.md](docs/06-updater.md)。
+多端打包与签名见 [docs/05-ci.md](docs/05-ci.md)，自动更新见 [docs/06-updater.md](docs/06-updater.md)，
+云厂商对接与最小权限策略见 [docs/07-cloud.md](docs/07-cloud.md)。
 
 ## 已知限制（v0.1）
 
-- 云厂商适配器只有 Mock；真实接入需要处理签名、地域、分页与限流。
+- 云厂商：阿里云与 AWS 已真实对接（签名 + 分页 + 开关机），腾讯云等仍是 Mock。
 - 同步是整条记录的 LWW，并发修改会覆盖，落败版本仅计数，尚未做可回滚的冲突快照。
 - 删除暂不支持墓碑同步（归档替代删除）。
 - `node:sqlite` 仍是实验性 API，升级 Node 大版本时需回归。

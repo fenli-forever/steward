@@ -13,7 +13,7 @@
 | 中间人攻击 | 窃取令牌或密文 | 生产环境强制 HTTPS；令牌只是随机串，泄漏可单独吊销 |
 | 恶意 CSV 文件 | 解析崩溃 / 注入 | 解析器不执行任何内容、不联网；限制行数与大小 |
 | 供应链攻击（npm 依赖） | 后门 | 依赖面尽量小（crypto 只用 @noble，服务端只用 fastify） |
-| 云厂商 AK/SK 泄漏 | 攻击者控制你的服务器 | 最小权限子账号 + 建议只读；密钥只存本机；v1 支持按账号吊销 |
+| 云厂商 AK/SK 泄漏 | 攻击者控制你的服务器 | 最小权限子账号 + 建议只读；密钥只存本机；签名在 Rust 侧完成，AK 不进 JS |
 
 **不在威胁模型内**：已 root 的设备、被系统级键盘记录器感染的机器、用户主动把口令贴到网上。
 
@@ -62,6 +62,9 @@ scrypt(passphrase, salt, N=32768, r=8, p=1, dkLen=32)
 
 Rust 侧命令：`secret_set` / `secret_get` / `secret_delete`，写入后立即 `zeroize` 内存副本，
 单条上限 8KB（防误传大文件）。
+
+云厂商调用（`cloud_list_hosts` / `cloud_power` / `cloud_validate`）全部在 Rust 侧签名并发请求，
+**AccessKey 从钥匙串读出后不会回到前端**，也不会进入任何日志或同步请求。
 
 **前端绝不把凭据放进 zustand 的持久化状态**：`syncPassphrase` 在 `partialize` 中被显式排除。
 

@@ -19,11 +19,11 @@
 
 ### 1.1 云厂商真实接入（P0）
 
-| 厂商 | 方式 | 最小权限策略 |
+| 厂商 | 方式 | 状态 |
 | --- | --- | --- |
-| 阿里云 | Rust SDK `alibabacloud_ecs` 或 OpenAPI 直签 | `ecs:DescribeInstances`、`ecs:StartInstance`、`ecs:StopInstance` |
-| 腾讯云 | TC3-HMAC-SHA256 手写签名（无官方 Rust SDK） | `cvm:DescribeInstances`、`cvm:StartInstances`、`cvm:StopInstances` |
-| AWS | `aws-sdk-ec2`（Rust） | `ec2:DescribeInstances` + 条件化启停 |
+| 阿里云 | RPC OpenAPI + Signature 1.0（Rust 手写签名） | ✅ 已完成 |
+| AWS | Query API + SigV4（Rust 手写签名，对齐官方测试向量） | ✅ 已完成 |
+| 腾讯云 | TC3-HMAC-SHA256 手写签名 | ⛔ 待做 |
 
 验收：
 

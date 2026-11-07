@@ -97,3 +97,7 @@ jobs:
 
       - name: cargo check
         run: cargo check --manifest-path apps/app/src-tauri/Cargo.toml
+
+      # 云厂商签名算法有官方示例做断言，必须在 CI 里跑
+      - name: cargo test
+        run: cargo test --lib --manifest-path apps/app/src-tauri/Cargo.toml

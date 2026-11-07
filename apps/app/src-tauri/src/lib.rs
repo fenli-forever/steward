@@ -10,6 +10,8 @@
 use keyring::Entry;
 use zeroize::Zeroize;
 
+mod cloud;
+
 /// 钥匙串里的服务名。改成自己的 Bundle ID，避免和别的 App 撞车。
 const SERVICE: &str = "com.steward.app";
 
@@ -87,7 +89,10 @@ pub fn run() {
             secret_set,
             secret_get,
             secret_delete,
-            app_info
+            app_info,
+            cloud::cloud_list_hosts,
+            cloud::cloud_power,
+            cloud::cloud_validate
         ])
         .run(tauri::generate_context!())
         .expect("启动 Steward 失败");

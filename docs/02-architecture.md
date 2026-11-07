@@ -81,7 +81,7 @@ Tauri 的 WebView 复用系统内核，桌面包体小，移动端也能用同�
 | `Card` | kind, issuer, last4, creditLimitMinor, billingDay, dueDay, secretRef | ✅ | 只存末四位 |
 | `Statement` | cardId, period, dueDate, totalAmountMinor, lines[] | ✅ | 含明细行 |
 | `CloudAccount` | provider, alias, regions, secretRef | ✅ | secretRef 只是本地索引 |
-| `Host` | instanceId, region, status, spec, cost | ❌ | 从云端实时拉取的缓存 |
+| `Host` | instanceId, region, status, spec, cost | ❌ | 从云端实时拉取的缓存；阿里云 / AWS 已真实接入 |
 | `SmartHomeHub` | kind, endpoint, secretRef | ✅ | v2 |
 | 凭据（AK/SK、密码） | — | ❌ | 系统钥匙串，永不出设备 |
 
@@ -145,9 +145,10 @@ interface CloudProviderAdapter {
 
 - 所有方法**返回 Result 而不抛异常**：云厂商的限流、地域不可用、AK 过期都是常态，必须能在 UI 上逐条呈现。
 - `Host.id = ${cloudAccountId}/${instanceId}`：同名实例在不同账号/地域下不会互相覆盖。
-- 真实实现放在 `apps/app/src-tauri`（Rust SDK）或 前端 `fetch` + 签名？**选择 Rust 侧**：
-  AK/SK 不出现在 JS 内存，且各厂商 Rust SDK 已成熟（阿里云 `alibabacloud-*`、AWS `aws-sdk-ec2`、腾讯云签名手写）。
-  前端只调用 `tauri::command` 拿标准化后的 `Host[]`。
+- 真实实现放在 **Rust 侧**（`apps/app/src-tauri/src/cloud/`）：AK/SK 不出现在 JS 内存。
+- 没有引入 aws-sdk / 阿里云 SDK：两家都能用「手写签名 + 一次 HTTP 请求」解决，
+  依赖少、编译快。SigV4 用 AWS 官方示例做单元测试，阿里云用 V1 签名（规范简单、可验证）。
+- 前端只调用 `tauri::command` 拿标准化后的 `Host[]`，浏览器预览模式自动退回 Mock。
 
 ## 7. 构建与分发
 

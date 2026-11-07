@@ -9,22 +9,11 @@
  * 注意：这里存的是「最终密文」的索引，同步服务器永远拿不到这些值。
  */
 
+import { invoke } from '@tauri-apps/api/core';
+
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-interface InvokeFn {
-  (cmd: string, args?: Record<string, unknown>): Promise<unknown>;
-}
 
-let invokeFn: InvokeFn | null = null;
-
-async function invoke(cmd: string, args?: Record<string, unknown>): Promise<unknown> {
-  if (!isTauri) throw new Error('当前环境不支持系统钥匙串');
-  if (!invokeFn) {
-    const mod = (await import('@tauri-apps/api/core')) as { invoke: InvokeFn };
-    invokeFn = mod.invoke;
-  }
-  return invokeFn(cmd, args);
-}
 
 const PREFIX = 'steward.secret.';
 
