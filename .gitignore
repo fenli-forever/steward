@@ -11,3 +11,6 @@ target/
 *.sqlite
 .vite/
 coverage/
+
+# pnpm 内容寻址存储（通常应在用户目录，此处因环境原因落在仓库内）
+.pnpm-store/
