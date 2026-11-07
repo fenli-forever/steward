@@ -518,6 +518,9 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          # 必须显式指定 tag_name，否则会生成一个 untagged-xxx 的草稿，跟 tag 对不上
+          tag_name: ${{ github.ref_name }}
+          name: Steward ${{ github.ref_name }}
           # 默认草稿：先自己验证再点发布。仓库变量 PUBLISH_DRAFT=false 可改为直接发布
           draft: ${{ vars.PUBLISH_DRAFT != 'false' }}
           generate_release_notes: true
