@@ -1,0 +1,25 @@
+{
+  "name": "steward",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Steward - 个人数字资产管家：银行卡、信用卡、多云主机、智能家居",
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "dev": "pnpm --filter @steward/core build && pnpm --filter @steward/app dev",
+    "dev:sync": "pnpm --filter @steward/sync dev",
+    "tauri": "pnpm --filter @steward/app tauri",
+    "clean": "rm -rf packages/*/dist services/*/dist apps/*/dist"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@tauri-apps/cli"
+    ]
+  }
+}

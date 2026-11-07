@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "默认权限：仅开放窗口基础能力与外部链接打开",
+  "windows": ["main"],
+  "permissions": ["core:default", "opener:default"]
+}
