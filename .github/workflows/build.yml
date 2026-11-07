@@ -415,9 +415,84 @@ jobs:
           retention-days: 7
           path: steward-ios.ipa
 
+  # 给「临时签名 / 免费 Apple ID」用户用：产出未签名真机 IPA，
+  # 下载后用 Sideloadly / AltStore 用自己的 Apple ID 重签并安装。
+  # 不走 Tauri 的 archive+export（那一步强依赖签名），直接 xcodebuild 关掉签名。
+  ios-unsigned:
+    name: iOS 未签名 IPA（自签用）
+    needs: test
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.targets == 'all' || inputs.targets == 'mobile' || inputs.targets == 'ios' }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装 Rust（iOS 真机目标）
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/app/src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @steward/core build
+
+      - name: 初始化 iOS 工程
+        working-directory: apps/app
+        run: pnpm tauri ios init --ci
+
+      - name: 构建未签名 .app
+        working-directory: apps/app/src-tauri/gen/apple
+        run: |
+          set -euo pipefail
+          PROJECT=$(ls -d *.xcodeproj | head -n 1)
+          SCHEME=$(basename "$PROJECT" .xcodeproj)
+          echo "project=$PROJECT scheme=$SCHEME"
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$RUNNER_TEMP/ios-dd" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: 打包成 .ipa
+        run: |
+          set -euo pipefail
+          APP=$(find "$RUNNER_TEMP/ios-dd/Build/Products" -maxdepth 3 -name "*.app" -type d | head -n 1)
+          if [ -z "$APP" ]; then
+            echo "没找到 .app，构建产物目录如下："
+            find "$RUNNER_TEMP/ios-dd/Build/Products" -maxdepth 3 | head -n 40
+            exit 1
+          fi
+          echo "app=$APP"
+          rm -rf Payload steward-ios-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry steward-ios-unsigned.ipa Payload
+          ls -lh steward-ios-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steward-ios-unsigned
+          if-no-files-found: error
+          retention-days: 7
+          path: steward-ios-unsigned.ipa
+
   release:
     name: 汇总到 Release
-    needs: [macos, windows, linux, android, ios, ios-ipa]
+    needs: [macos, windows, linux, android, ios, ios-unsigned, ios-ipa]
     if: ${{ always() && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     steps:
