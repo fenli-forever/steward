@@ -14,3 +14,6 @@ coverage/
 
 # pnpm 内容寻址存储（通常应在用户目录，此处因环境原因落在仓库内）
 .pnpm-store/
+
+# Tauri 移动端原生工程：由 CI 现场 `tauri android/ios init` 生成
+apps/app/src-tauri/gen/

@@ -82,6 +82,25 @@ pnpm dev:sync      # 同步服务（watch 模式）
 pnpm tauri         # 透传 Tauri CLI（dev / build / android / ios）
 ```
 
+## 持续集成与多端打包
+
+两条 GitHub Actions 流水线（`.github/workflows/`）：
+
+| 工作流 | 触发 | 内容 |
+| --- | --- | --- |
+| `ci.yml` | push main / PR | 类型检查、单测、前端构建、`cargo check`（约 5 分钟） |
+| `build.yml` | 手动 / `v*` tag | macOS `.dmg`、Windows `.exe`+`.msi`、Linux `.AppImage`+`.deb`、Android `.apk`、iOS 模拟器包 |
+
+打一个 tag 就会把五端产物汇总成草稿 Release：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0      # 需先配好 git remote
+```
+
+默认产出**未正式签名**的包（debug APK、模拟器 .app、ad-hoc 签名的 macOS 包），
+接入证书的方式与各平台 Secret 清单见 [docs/05-ci.md](docs/05-ci.md)。
+
 ## 目录结构
 
 ```
@@ -95,7 +114,8 @@ packages/core/            与平台无关的领域层（零 DOM、零 SDK 依赖
   src/crypto/             XChaCha20-Poly1305、scrypt 密钥派生
   src/sync/               记录封包、LWW 合并、同步客户端
 services/sync/            自托管同步服务（Fastify + node:sqlite）
-docs/                     产品、架构、安全、路线图
+.github/workflows/        CI（质量门禁）与多端打包流水线
+docs/                     产品、架构、安全、路线图、CI 说明
 ```
 
 ## 设计上的几个关键决定
@@ -106,7 +126,8 @@ docs/                     产品、架构、安全、路线图
 4. **账单导入永不整体失败**：逐行返回失败原因，用户能手工补录。
 5. **适配器模式**：云厂商差异被 `CloudProviderAdapter` 吸收，接真实 SDK 时不动 UI。
 
-细节见 [docs/02-architecture.md](docs/02-architecture.md) 与 [docs/03-security.md](docs/03-security.md)。
+细节见 [docs/02-architecture.md](docs/02-architecture.md) 与 [docs/03-security.md](docs/03-security.md)；
+多端打包与签名见 [docs/05-ci.md](docs/05-ci.md)。
 
 ## 已知限制（v0.1）
 
@@ -114,7 +135,8 @@ docs/                     产品、架构、安全、路线图
 - 同步是整条记录的 LWW，并发修改会覆盖，落败版本仅计数，尚未做可回滚的冲突快照。
 - 删除暂不支持墓碑同步（归档替代删除）。
 - `node:sqlite` 仍是实验性 API，升级 Node 大版本时需回归。
-- 桌面端未在本仓库 CI 中编译（当前环境无 Rust），首次 `pnpm tauri dev` 会下载依赖。
+- 桌面端已本地验证：`cargo check` 通过，`tauri build` 能产出 `Steward.app`（3.4MB）；`.dmg` 因本机沙箱拿不到 `hdiutil` 权限而失败，交给 CI 完成。
+- GitHub Actions 流水线已写好但**尚未在真实仓库运行过**（本仓库还没配 git remote），首次跑可能需要微调 runner 版本。
 
 ## 许可证
 

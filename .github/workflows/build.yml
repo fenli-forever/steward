@@ -1,0 +1,300 @@
+name: build
+
+# 多端打包：macOS / Windows / Linux / Android / iOS。
+#
+# 触发方式：
+#   - 手动：Actions → build → Run workflow
+#   - 打 tag：git tag v0.1.0 && git push origin v0.1.0（会自动创建草稿 Release 并附上产物）
+#
+# 产物默认**不签名**（debug APK / 模拟器 .app / ad-hoc 签名的 macOS 包），
+# 因为签名证书必须放在仓库 Secrets 里。如何接入签名见 docs/05-ci.md。
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: '要构建哪些平台'
+        type: choice
+        default: all
+        options:
+          - all
+          - desktop
+          - mobile
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  # 移动端打包在 Tauri CLI 里会读 CI 变量跳过交互式提问
+  CI: 'true'
+
+jobs:
+  test:
+    name: 先行检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @steward/core build
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  macos:
+    name: macOS 通用包 (arm64 + x64)
+    needs: test
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.targets != 'mobile' }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装 Rust（两个架构）
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/app/src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @steward/core build
+
+      - name: 打包 .dmg
+        working-directory: apps/app
+        env:
+          # 没有开发者证书时用 ad-hoc 签名，避免 Apple Silicon 下载后被判定为「已损坏」
+          APPLE_SIGNING_IDENTITY: '-'
+        run: pnpm tauri build --target universal-apple-darwin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steward-macos-universal
+          if-no-files-found: error
+          path: apps/app/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+
+  windows:
+    name: Windows 安装包 (nsis + msi)
+    needs: test
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.targets != 'mobile' }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/app/src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @steward/core build
+
+      - name: 打包 .exe / .msi
+        working-directory: apps/app
+        run: pnpm tauri build --bundles nsis,msi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steward-windows-x64
+          if-no-files-found: error
+          path: |
+            apps/app/src-tauri/target/release/bundle/nsis/*.exe
+            apps/app/src-tauri/target/release/bundle/msi/*.msi
+
+  linux:
+    name: Linux (AppImage + deb)
+    needs: test
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.targets != 'mobile' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 安装系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/app/src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @steward/core build
+
+      - name: 打包 AppImage / deb
+        working-directory: apps/app
+        run: pnpm tauri build --bundles appimage,deb
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steward-linux-x64
+          if-no-files-found: error
+          path: |
+            apps/app/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/app/src-tauri/target/release/bundle/deb/*.deb
+
+  android:
+    name: Android APK (arm64 + armv7)
+    needs: test
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.targets != 'desktop' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 准备 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 安装 NDK 与构建工具
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager --install "ndk;27.0.12077973" "platforms;android-35" "build-tools;35.0.0"
+          echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装 Rust（Android 目标）
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/app/src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @steward/core build
+
+      # gen/android 不入库，每次 CI 现场生成，避免 Gradle 工程与 Tauri 版本漂移
+      - name: 初始化 Android 工程
+        working-directory: apps/app
+        run: pnpm tauri android init --ci
+
+      - name: 打包 debug APK
+        working-directory: apps/app
+        run: pnpm tauri android build --apk --debug --ci --target aarch64 armv7
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steward-android
+          if-no-files-found: error
+          path: apps/app/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+
+  ios:
+    name: iOS 模拟器包
+    needs: test
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.targets != 'desktop' }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装 Rust（iOS 目标）
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/app/src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @steward/core build
+
+      - name: 初始化 iOS 工程
+        working-directory: apps/app
+        run: pnpm tauri ios init --ci
+
+      # 模拟器构建不需要证书；真机 / TestFlight 需要 Apple 签名，见 docs/05-ci.md
+      - name: 构建模拟器 .app
+        working-directory: apps/app
+        run: pnpm tauri ios build --debug --target aarch64-sim --ci
+
+      - name: 收集并压缩 .app
+        run: |
+          APP_PATH=$(find apps/app/src-tauri/gen/apple -maxdepth 6 -name '*.app' -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "未找到 .app，输出目录如下："
+            find apps/app/src-tauri/gen/apple -maxdepth 6 -type d | head -n 60
+            exit 1
+          fi
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" steward-ios-simulator.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steward-ios-simulator
+          if-no-files-found: error
+          path: steward-ios-simulator.zip
+
+  release:
+    name: 汇总到 Release
+    needs: [macos, windows, linux, android, ios]
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: 列出产物
+        run: ls -R artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: artifacts/**/*
