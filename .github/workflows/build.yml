@@ -453,8 +453,13 @@ jobs:
         run: |
           set -euo pipefail
           PROJECT=$(ls -d *.xcodeproj | head -n 1)
-          SCHEME=$(basename "$PROJECT" .xcodeproj)
-          echo "project=$PROJECT scheme=$SCHEME"
+          echo "project: $PROJECT"
+          ls -la
+          # 工程名是 crate 名（steward），scheme 名可能不同，必须查一下
+          xcodebuild -list -project "$PROJECT"
+          SCHEME=$(xcodebuild -list -json -project "$PROJECT" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['project']['schemes'][0])")
+          echo "scheme: $SCHEME"
           xcodebuild \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
