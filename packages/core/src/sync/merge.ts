@@ -1,16 +1,9 @@
-import {
-  SyncClient,
-  compareVersions,
-  openRecord,
-  sealRecord,
-  type Card,
-  type CloudAccount,
-  type EncryptedRecord,
-  type Statement,
-} from '@steward/core';
+import { SyncClient } from './client.js';
+import { compareContentVersion, openRecord, sealRecord, type EncryptedRecord } from './records.js';
+import type { Card, CloudAccount, Statement } from '../types.js';
 
 /**
- * 端到端加密同步的一次完整往返。
+ * 端到端加密同步的一次完整往返（领域层实现，无 UI 依赖）。
  *
  * 流程：拉全量 → 按 (updatedAt, rev, deviceId) 逐条 LWW 合并 → 把合并后的
  * 结果推回服务器。数据量是「个人资产」级别（几百到几千条），全量拉取足够快，
@@ -98,15 +91,14 @@ export async function performSync(options: SyncOptions): Promise<SyncResult> {
     const localRecord = local.get(key) ?? null;
 
     if (remoteRecord && localRecord) {
-      const remoteWins = compareVersions(remoteRecord, localRecord) > 0;
-      if (remoteWins) {
+      const comparison = compareContentVersion(localRecord, remoteRecord);
+      if (comparison <= 0) {
+        // 远端更新或版本相同：保留远端，避免两台设备互相回推
         winners.push(remoteRecord);
-        // 本地这次修改被远端覆盖，计数后交给 UI 提示
-        if (remoteRecord.sealed.ciphertext !== localRecord.sealed.ciphertext) overwritten += 1;
+        if (localRecord.updatedAt !== remoteRecord.updatedAt) overwritten += 1;
       } else {
         winners.push(localRecord);
-        // 本地的版本更新，推回服务器
-        if (remoteRecord.sealed.ciphertext !== localRecord.sealed.ciphertext) toPush.push(localRecord);
+        toPush.push(localRecord);
       }
     } else if (remoteRecord) {
       winners.push(remoteRecord);

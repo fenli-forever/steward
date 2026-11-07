@@ -56,10 +56,3 @@ export async function deleteSecret(key: string): Promise<void> {
   }
   window.localStorage.removeItem(PREFIX + key);
 }
-
-/** 演示环境下的占位凭据，只让 Mock 适配器有值可用。 */
-export async function ensureDemoSecret(ref: string): Promise<void> {
-  const existing = await getSecret(ref);
-  if (existing) return;
-  await setSecret(ref, JSON.stringify({ accessKeyId: `demo-${ref}`, accessKeySecret: 'demo-secret' }));
-}

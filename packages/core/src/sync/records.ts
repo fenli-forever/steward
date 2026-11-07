@@ -35,12 +35,27 @@ export interface Conflict<T> {
   reason: 'remote-newer' | 'local-newer' | 'tie-local';
 }
 
-/** 版本比较：先看时间，再看 rev，最后用 deviceId 打破平局（保证各端结果一致）。 */
-export function compareVersions(a: EncryptedRecord, b: EncryptedRecord): number {
+/**
+ * 内容版本比较：只看 (updatedAt, rev)，不看是哪个设备写的。
+ *
+ * 因为密文带随机 nonce，同一份数据在不同设备上加密出来必然不同，
+ * 所以「设备 ID」不能用来判断内容是否变化 —— 那会让两台设备无限互推。
+ */
+export function compareContentVersion(a: EncryptedRecord, b: EncryptedRecord): number {
   const at = Date.parse(a.updatedAt);
   const bt = Date.parse(b.updatedAt);
   if (at !== bt) return at < bt ? -1 : 1;
   if (a.rev !== b.rev) return a.rev < b.rev ? -1 : 1;
+  return 0;
+}
+
+/**
+ * 全序比较：在内容版本之上用 deviceId 打破平局。
+ * 用于需要「各端排序结果完全一致」的场景（例如服务端拒绝回退）。
+ */
+export function compareVersions(a: EncryptedRecord, b: EncryptedRecord): number {
+  const content = compareContentVersion(a, b);
+  if (content !== 0) return content;
   if (a.deviceId === b.deviceId) return 0;
   return a.deviceId < b.deviceId ? -1 : 1;
 }

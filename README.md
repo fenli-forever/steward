@@ -26,7 +26,7 @@
 | 卡包：增删卡、额度/余额、账单列表、标记已还 | ✅ 可用 |
 | 银行账单 CSV 导入（多格式、容错、逐行报错） | ✅ 可用，52 个单测覆盖 |
 | 多云主机列表 / 开关机 / 成本汇总 | ✅ 界面与数据流已通，**适配器为 Mock** |
-| 端到端加密同步（自建服务器、设备配对、LWW 合并） | ✅ 协议与服务端已完成并测试 |
+| 端到端加密同步（自建服务器、设备配对、LWW 合并） | ✅ 协议与服务端已完成，30+ 单测 |
 | 真实云厂商 SDK（阿里云/腾讯云/AWS） | ⛔ 未接入，见路线图 |
 | 智能家居（Home Assistant / Matter） | ⛔ 数据模型已预留，未接入 |
 
@@ -74,7 +74,7 @@ node services/sync/dist/main.js init   # 建仓库，输出 Vault ID + 一次性
 ## 常用命令
 
 ```bash
-pnpm test          # 全部单测（core 52 个 + sync 21 个）
+pnpm test          # 全部单测（core 53 个 + sync 26 个）
 pnpm typecheck     # 全仓类型检查
 pnpm build         # 构建 core + 前端产物
 pnpm dev           # 前端开发服务器

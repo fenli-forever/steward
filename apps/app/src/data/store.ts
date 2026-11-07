@@ -7,6 +7,7 @@ import {
   newPrefixedId,
   pairDevice,
   parseStatementCsv,
+  performSync,
   toMinorUnits,
   type StoredKdfConfig,
   type ImportIssue,
@@ -24,7 +25,6 @@ import {
 } from '@steward/core';
 import { createSeedData } from './seed';
 import { deleteSecret, getSecret, setSecret } from './secrets';
-import { performSync } from './sync';
 
 export interface NewCardInput {
   kind: CardKind;
@@ -164,7 +164,7 @@ export const useAppStore = create<AppState>()(
           return { imported: 0, issues: result.issues, statement: null, meta: result.meta };
         }
 
-        const lines: StatementLine[] = result.lines.map((line, index) => ({
+        const lines: StatementLine[] = result.lines.map((line) => ({
           id: newPrefixedId('line'),
           postedAt: line.postedAt,
           merchant: line.merchant,
@@ -172,8 +172,6 @@ export const useAppStore = create<AppState>()(
           currency: line.currency,
           direction: line.direction,
           ...(line.note ? { note: line.note } : {}),
-          // 保留源文件顺序，便于对账
-          ...(index === -1 ? {} : {}),
         }));
 
         const dates = lines.map((l) => l.postedAt).sort();

@@ -1,6 +1,6 @@
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { DatabaseSync } from 'node:sqlite';
-import { compareVersions, type EncryptedRecord } from '@steward/core';
+import { compareContentVersion, type EncryptedRecord } from '@steward/core';
 import { bearerToken, hashToken, newToken, PAIRING_TOKEN_TTL_MS, safeEqualHex } from './auth.js';
 import { openDatabase } from './db.js';
 
@@ -213,8 +213,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
           .prepare('SELECT * FROM records WHERE vault_id = ? AND collection = ? AND id = ?')
           .get(vaultId, record.collection, record.id) as RecordRow | undefined;
 
-        if (existing && compareVersions(toWireRecord(existing), record) >= 0) {
-          // 服务器已有的版本更新或相同，保持幂等，不推进 seq
+        if (existing && compareContentVersion(toWireRecord(existing), record) >= 0) {
+          // 服务器已有的内容版本更新或相同，保持幂等，不推进 seq
           continue;
         }
         const seqRow = db.prepare('SELECT cursor FROM vaults WHERE id = ?').get(vaultId) as { cursor: number } | undefined;

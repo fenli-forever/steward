@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MemoryRecordStore,
+  compareContentVersion,
   compareVersions,
   mergeRecords,
   sealRecord,
@@ -93,6 +94,15 @@ describe('同步记录', () => {
     const b = record({ deviceId: 'device_b' });
     expect(compareVersions(a, b)).toBeLessThan(0);
     expect(compareVersions(b, a)).toBeGreaterThan(0);
+  });
+
+  it('内容版本比较忽略设备差异（防止两台设备无限互推）', () => {
+    const a = record({ deviceId: 'device_a' });
+    const b = record({ deviceId: 'device_b' });
+    expect(compareContentVersion(a, b)).toBe(0);
+    expect(compareVersions(a, b)).not.toBe(0);
+    expect(compareContentVersion(record({ updatedAt: '2026-11-02T00:00:00.000Z' }), a)).toBeGreaterThan(0);
+    expect(compareContentVersion(record({ rev: 5 }), a)).toBeGreaterThan(0);
   });
 
   it('合并时以较新版本为准，并标记冲突', () => {

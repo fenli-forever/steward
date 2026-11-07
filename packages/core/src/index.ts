@@ -16,6 +16,7 @@ export * from './crypto/vault.js';
 
 export * from './sync/records.js';
 export * from './sync/client.js';
+export * from './sync/merge.js';
 
 export * from './bills/csv.js';
 
