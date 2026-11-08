@@ -1,6 +1,6 @@
 {
   "name": "steward",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Steward - 个人数字资产管家：银行卡、信用卡、多云主机、智能家居",
   "packageManager": "pnpm@10.28.2",
