@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "默认权限：窗口/事件等核心能力 + 更新检查与重启",
+  "description": "所有平台：窗口与事件等核心能力",
   "windows": ["main"],
-  "permissions": ["core:default", "updater:default", "process:default"]
+  "permissions": ["core:default"]
 }
