@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { useEffect, useLayoutEffect, useRef } from 'react';
+import { matchPath, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import DashboardPage from './pages/Dashboard';
 import CardsPage from './pages/Cards';
 import CloudPage from './pages/Cloud';
@@ -7,14 +7,24 @@ import SettingsPage from './pages/Settings';
 import { autoCheckForUpdates, useUpdater } from './data/updater';
 
 const NAV = [
-  { to: '/', label: '总览', icon: '◎', end: true },
-  { to: '/cards', label: '卡包', icon: '▣', end: false },
-  { to: '/cloud', label: '云主机', icon: '☁', end: false },
-  { to: '/settings', label: '设置', icon: '⚙', end: false },
+  { to: '/', label: '总览', icon: '◎', page: DashboardPage },
+  { to: '/cards', label: '卡包', icon: '▣', page: CardsPage },
+  { to: '/cloud', label: '云主机', title: '多云主机', icon: '☁', page: CloudPage },
+  { to: '/settings', label: '设置', icon: '⚙', page: SettingsPage },
 ];
 
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const mainRef = useRef<HTMLElement>(null);
+  const current = NAV.find((item) => matchPath(item.to, location.pathname)) ?? NAV[0]!;
+  // HashRouter 的 idx 只计算应用路由记录，直接打开子页时回到总览。
+  const canGoBack = window.history.state?.idx > 0;
   const updateVersion = useUpdater((state) => (state.status === 'available' ? state.available?.version : undefined));
+
+  useLayoutEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [location.key]);
 
   // 启动 3 秒后静默检查一次更新，失败不打扰用户
   useEffect(() => {
@@ -24,6 +34,22 @@ export default function App() {
 
   return (
     <div className="shell">
+      <header className="mobile-header">
+        {canGoBack || current.to !== '/' ? (
+          <button
+            type="button"
+            className="btn btn-ghost mobile-back"
+            onClick={() => {
+              if (canGoBack) navigate(-1);
+              else navigate('/', { replace: true });
+            }}
+          >
+            <span aria-hidden="true">‹</span> 返回
+          </button>
+        ) : null}
+        <h1 className="mobile-title">{current.title ?? current.label}</h1>
+      </header>
+
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">S</div>
@@ -33,12 +59,12 @@ export default function App() {
           </div>
         </div>
 
-        <nav className="nav">
+        <nav className="nav" aria-label="主导航">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.end}
+              end={item.to === '/'}
               className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
             >
               <span className="nav-icon" aria-hidden="true">
@@ -60,12 +86,9 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="main">
+      <main className="main" ref={mainRef}>
         <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/cards" element={<CardsPage />} />
-          <Route path="/cloud" element={<CloudPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          {NAV.map(({ to, page: Page }) => <Route key={to} path={to} element={<Page />} />)}
           <Route path="*" element={<DashboardPage />} />
         </Routes>
       </main>

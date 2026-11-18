@@ -113,7 +113,7 @@ export default function CloudPage() {
                     gap: 10,
                   }}
                 >
-                  <span className="dim" style={{ fontSize: 12 }}>
+                  <span className="dim cloud-sync-status">
                     {account.lastSyncError ? `同步失败：${account.lastSyncError}` : `同步于 ${lastSeenLabel(account)}`}
                   </span>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -144,7 +144,7 @@ export default function CloudPage() {
 
       <section className="panel section-gap">
         <div className="panel-head">
-          <h2 className="panel-title">主机</h2>
+          <h2 className="panel-title" id="cloud-hosts-title">主机</h2>
           <div className="chips">
             <button className={`chip ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
               全部
@@ -164,8 +164,8 @@ export default function CloudPage() {
         {visibleHosts.length === 0 ? (
           <EmptyState>没有主机。绑定云账号后点「同步」拉取实例列表。</EmptyState>
         ) : (
-          <div className="table-wrap">
-            <table className="table">
+          <div className="table-wrap cloud-hosts-scroll" role="region" aria-labelledby="cloud-hosts-title" tabIndex={0}>
+            <table className="table cloud-hosts-table">
               <thead>
                 <tr>
                   <th>实例</th>
