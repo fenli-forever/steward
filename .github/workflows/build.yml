@@ -22,6 +22,7 @@ on:
           - mobile
           - android
           - ios
+          - ios-unsigned
   push:
     tags:
       - 'v*'
@@ -421,8 +422,8 @@ jobs:
   ios-unsigned:
     name: iOS 未签名 IPA（自签用）
     needs: test
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.targets == 'all' || inputs.targets == 'mobile' || inputs.targets == 'ios' }}
-    runs-on: macos-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.targets == 'all' || inputs.targets == 'mobile' || inputs.targets == 'ios' || inputs.targets == 'ios-unsigned' }}
+    runs-on: ${{ inputs.targets == 'ios-unsigned' && 'macos-26-intel' || 'macos-latest' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
